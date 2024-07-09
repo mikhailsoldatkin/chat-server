@@ -23,28 +23,24 @@ type server struct {
 }
 
 // Create handles the creation of a new chat with provided users.
-func (s *server) Create(ctx context.Context, req *pb.CreateRequest) (*pb.CreateResponse, error) {
-	_ = ctx
+func (s *server) Create(_ context.Context, req *pb.CreateRequest) (*pb.CreateResponse, error) {
 	my_logger.Info("chat 21 created, users: %v", req.Users)
 	return &pb.CreateResponse{Id: 21}, nil
 }
 
 // Delete removes a chat by ID.
-func (s *server) Delete(ctx context.Context, req *pb.DeleteRequest) (*emptypb.Empty, error) {
-	_ = ctx
+func (s *server) Delete(_ context.Context, req *pb.DeleteRequest) (*emptypb.Empty, error) {
 	my_logger.Info("chat %v deleted", req.GetId())
 	return &emptypb.Empty{}, nil
 }
 
 // SendMessage handles sending message to chat from user.
-func (s *server) SendMessage(ctx context.Context, req *pb.SendMessageRequest) (*emptypb.Empty, error) {
-	_ = ctx
+func (s *server) SendMessage(_ context.Context, req *pb.SendMessageRequest) (*emptypb.Empty, error) {
 	my_logger.Info("message %q from user %v sent to chat %v", req.Text, req.FromUser, req.ChatId)
 	return &emptypb.Empty{}, nil
 }
 
 func main() {
-
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", grpcPort))
 	if err != nil {
 		my_logger.Fatal("failed to listen: %v", err)
