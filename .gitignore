@@ -1,2 +1,14 @@
-.idea
+# IDE related
+.idea/
+.vscode/
+
 /bin/
+
+# OS related
+.DS_Store
+
+# Environment variables file
+.env
+
+# Vendor directory
+/vendor/
