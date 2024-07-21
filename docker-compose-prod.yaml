@@ -12,7 +12,7 @@ services:
 
   db:
     image: postgres:16.3-alpine3.20
-    container_name: ${DB_HOST}
+    container_name: ${APP_NAME}_${DB_HOST}
     ports:
       - ${DB_HOST_PORT}:${DB_PORT}
     env_file:
