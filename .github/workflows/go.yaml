@@ -144,7 +144,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
           source: "${{ env.COMPOSE_FILE }}, .env"
-          target: "./app"
+          target: "./${{ env.APP_NAME }}"
           rm: true
 
       - name: Executing remote ssh commands to deploy
@@ -155,7 +155,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
           script: |
-            cd app
+            cd ${{ env.APP_NAME }}
             
             docker compose -f ${{ env.COMPOSE_FILE }} down
             docker system prune -a -f

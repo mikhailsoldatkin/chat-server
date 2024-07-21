@@ -1,6 +1,6 @@
 FROM golang:1.22 AS builder
 
-WORKDIR /app
+WORKDIR /chat
 
 RUN apt-get update &&  \
     apt-get upgrade -y &&  \
@@ -18,9 +18,9 @@ RUN apk update && \
     apk upgrade && \
     rm -rf /var/cache/apk/*
 
-WORKDIR /app
+WORKDIR /chat
 
-COPY --from=builder /app/chat_server .
+COPY --from=builder /chat/chat_server .
 COPY .env .
 
 CMD ["./chat_server"]
