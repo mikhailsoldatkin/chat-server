@@ -23,17 +23,17 @@ type server struct {
 }
 
 // Create handles the creation of a new chat with provided users.
-func (s *server) Create(_ context.Context, req *pb.CreateRequest) (*pb.CreateResponse, error) {
+func (s *server) Create(_ context.Context, _ *pb.CreateRequest) (*pb.CreateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
 // Delete removes a chat by ID.
-func (s *server) Delete(_ context.Context, req *pb.DeleteRequest) (*emptypb.Empty, error) {
+func (s *server) Delete(_ context.Context, _ *pb.DeleteRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
 // SendMessage handles sending message to chat from user.
-func (s *server) SendMessage(_ context.Context, req *pb.SendMessageRequest) (*emptypb.Empty, error) {
+func (s *server) SendMessage(_ context.Context, _ *pb.SendMessageRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
