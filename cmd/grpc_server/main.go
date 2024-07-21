@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 
+	sq "github.com/Masterminds/squirrel"
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikhailsoldatkin/chat-server/internal/config"
 	"github.com/mikhailsoldatkin/chat-server/internal/logger"
@@ -22,19 +25,184 @@ type server struct {
 	pool *pgxpool.Pool
 }
 
+// recordExists checks if a record with given ID exists in database table and returns an error if it doesn't.
+func (s *server) recordExists(ctx context.Context, ID int64, table string) error {
+	var exists bool
+	notFoundMsg := fmt.Sprintf("record with ID %d not found in %s table", ID, table)
+	query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM %s WHERE id=%d)", table, ID)
+	err := s.pool.QueryRow(ctx, query).Scan(&exists)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to check existence: %v", err)
+	}
+	if !exists {
+		return status.Errorf(codes.NotFound, notFoundMsg)
+	}
+	return nil
+}
+
+// isUserInChat checks if a user is part of a chat.
+func (s *server) isUserInChat(ctx context.Context, userID int64, chatID int64) error {
+	var exists bool
+	query := "SELECT EXISTS(SELECT 1 FROM chat_users WHERE chat_id=$1 AND user_id=$2)"
+	err := s.pool.QueryRow(ctx, query, chatID, userID).Scan(&exists)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to check if user is in chat: %v", err)
+	}
+	if !exists {
+		return status.Errorf(codes.InvalidArgument, "user %d is not a participant of chat %d", userID, chatID)
+	}
+	return nil
+}
+
 // Create handles the creation of a new chat with provided users.
-func (s *server) Create(_ context.Context, _ *pb.CreateRequest) (*pb.CreateResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+func (s *server) Create(ctx context.Context, req *pb.CreateRequest) (*pb.CreateResponse, error) {
+	if len(req.Users) == 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "no users provided for the chat")
+	}
+
+	tr, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
+	}
+	defer func(tx pgx.Tx, ctx context.Context) {
+		_ = tx.Rollback(ctx)
+	}(tr, ctx)
+
+	chatBuilder := sq.Insert("chats").
+		PlaceholderFormat(sq.Dollar).
+		Columns("created_at").
+		Values("NOW()").
+		Suffix("RETURNING id")
+
+	chatQuery, chatArgs, err := chatBuilder.ToSql()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to build chat insert query: %v", err)
+	}
+
+	var chatID int
+	err = tr.QueryRow(ctx, chatQuery, chatArgs...).Scan(&chatID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to insert chat: %v", err)
+	}
+
+	chatUserBuilder := sq.Insert("chat_users").
+		PlaceholderFormat(sq.Dollar).
+		Columns("chat_id", "user_id")
+
+	for _, userID := range req.Users {
+		chatUserBuilder = chatUserBuilder.Values(chatID, userID)
+	}
+
+	chatUserQuery, userArgs, err := chatUserBuilder.ToSql()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to build chat_users insert query: %v", err)
+	}
+
+	_, err = tr.Exec(ctx, chatUserQuery, userArgs...)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to insert users into chat_users: %v", err)
+	}
+
+	err = tr.Commit(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
+	}
+
+	logger.Info("chat with ID %d created with users: %v", chatID, req.Users)
+
+	return &pb.CreateResponse{Id: int64(chatID)}, nil
 }
 
 // Delete removes a chat by ID.
-func (s *server) Delete(_ context.Context, _ *pb.DeleteRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+func (s *server) Delete(ctx context.Context, req *pb.DeleteRequest) (*emptypb.Empty, error) {
+	chatID := req.GetId()
+
+	if err := s.recordExists(ctx, chatID, "chats"); err != nil {
+		return nil, err
+	}
+
+	tr, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
+	}
+	defer func(tr pgx.Tx, ctx context.Context) {
+		_ = tr.Rollback(ctx)
+	}(tr, ctx)
+
+	chatUserDeleteBuilder := sq.Delete("chat_users").
+		Where(sq.Eq{"chat_id": chatID}).
+		PlaceholderFormat(sq.Dollar)
+
+	chatUserDeleteQuery, chatUserDeleteArgs, err := chatUserDeleteBuilder.ToSql()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to build chat_users delete query: %v", err)
+	}
+
+	_, err = tr.Exec(ctx, chatUserDeleteQuery, chatUserDeleteArgs...)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to delete users from chat_users: %v", err)
+	}
+
+	chatDeleteBuilder := sq.Delete("chats").
+		Where(sq.Eq{"id": chatID}).
+		PlaceholderFormat(sq.Dollar)
+
+	chatDeleteQuery, chatDeleteArgs, err := chatDeleteBuilder.ToSql()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to build chats delete query: %v", err)
+	}
+
+	_, err = tr.Exec(ctx, chatDeleteQuery, chatDeleteArgs...)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to delete chat: %v", err)
+	}
+
+	err = tr.Commit(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
+	}
+
+	logger.Info("chat with ID %d deleted", chatID)
+
+	return &emptypb.Empty{}, nil
 }
 
-// SendMessage handles sending message to chat from user.
-func (s *server) SendMessage(_ context.Context, _ *pb.SendMessageRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+// SendMessage handles sending a message to a chat from a user.
+func (s *server) SendMessage(ctx context.Context, req *pb.SendMessageRequest) (*emptypb.Empty, error) {
+	chatID := req.GetChatId()
+	userID := req.GetFromUser()
+	messageText := req.GetText()
+
+	if err := s.recordExists(ctx, chatID, "chats"); err != nil {
+		return nil, err
+	}
+
+	// check user existence
+
+	if err := s.isUserInChat(ctx, userID, chatID); err != nil {
+		return nil, err
+	}
+
+	messageBuilder := sq.Insert("messages").
+		PlaceholderFormat(sq.Dollar).
+		Columns("chat_id", "from_user", "text", "timestamp").
+		Values(chatID, userID, messageText, time.Now().UTC()).
+		Suffix("RETURNING id")
+
+	query, args, err := messageBuilder.ToSql()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to build insert query: %v", err)
+	}
+
+	var messageID int64
+	err = s.pool.QueryRow(ctx, query, args...).Scan(&messageID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to send message: %v", err)
+	}
+
+	logger.Info("message with ID %d sent to chat %d by user %d", messageID, chatID, userID)
+
+	return &emptypb.Empty{}, nil
 }
 
 func main() {
