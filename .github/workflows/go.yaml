@@ -1,67 +1,164 @@
-name: Go
+name: CI
 
 on:
   push:
-    branches: [ main, master, dev ]
+    branches: [ main, dev ]
+    paths-ignore:
+      - '**/README.md'
   pull_request:
-    branches: [ main, master, dev ]
+    branches: [ main, dev ]
+    paths-ignore:
+      - '**/README.md'
+
+env:
+  APP_NAME: chat
+  MIGRATOR_NAME: chat_migrator
+  COMPOSE_FILE: docker-compose-prod.yaml
+  DB_HOST: db
+  DB_PORT: 5432
+  MIGRATIONS_DIR: ./migrations
+  GO_VERSION: 1.22
 
 jobs:
   build-and-test:
+    name: Build and test
     runs-on: ubuntu-latest
     steps:
-        - uses: actions/checkout@v3
+      - uses: actions/checkout@v4.1.7
 
-        - name: Set up Go
-          uses: actions/setup-go@v4
-          with:
-            go-version: '1.22'
-            cache-dependency-path: go.sum
+      - name: Set up Go
+        uses: actions/setup-go@v5.0.2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: go.sum
 
-        - name: Build
-          run: go build -o ./bin/ -v ./...
+      - name: Build
+        run: go build -o ./bin/ -v ./...
 
-        - name: Test
-          run: go test -v ./...
+      - name: Test
+        run: go test -v ./...
 
   linter:
-    name: lint
+    name: Linter check
     runs-on: ubuntu-latest
+    needs: build-and-test
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v4.1.7
+      - uses: actions/setup-go@v5.0.2
         with:
-          go-version: '1.22'
+          go-version: ${{ env.GO_VERSION }}
           cache: false
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v6.0.1
         with:
-          # Require: The version of golangci-lint to use.
-          # When `install-mode` is `binary` (default) the value can be v1.2 or v1.2.3 or `latest` to use the latest version.
-          # When `install-mode` is `goinstall` the value can be v1.2.3, `latest`, or the hash of a commit.
           version: v1.59
-
-          # Optional: working directory, useful for monorepos
-          # working-directory: somedir
-
-          # Optional: golangci-lint command line arguments.
-          #
-          # Note: By default, the `.golangci.yml` file should be at the root of the repository.
-          # The location of the configuration file can be changed by using `--config=`
           args: --timeout=30m --config=./.golangci.pipeline.yaml
 
-          # Optional: show only new issues if it's a pull request. The default value is `false`.
-          # only-new-issues: true
+  create_env_file:
+    name: Create .env file
+    runs-on: ubuntu-latest
+    needs: linter
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4.1.7
 
-          # Optional: if set to true, then all caching functionality will be completely disabled,
-          #           takes precedence over all other caching options.
-          # skip-cache: true
+      - name: Create .env file
+        run: |
+          touch .env
+          echo POSTGRES_DB=${{ secrets.POSTGRES_DB }} >> .env
+          echo POSTGRES_USER=${{ secrets.POSTGRES_USER }} >> .env
+          echo POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} >> .env
+          echo DB_PORT=${{ env.DB_PORT }} >> .env
+          echo DB_HOST=${{ env.DB_HOST }} >> .env
+          echo DB_HOST_PORT=${{ secrets.DB_HOST_PORT }} >> .env
+          echo MIGRATIONS_DIR=${{ env.MIGRATIONS_DIR }} >> .env
+          echo GRPC_PORT=${{ secrets.GRPC_PORT }} >> .env
+          echo DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }} >> .env
+          echo DOCKER_SERVER_IMAGE=${{ env.APP_NAME }} >> .env
+          echo DOCKER_MIGRATOR_NAME=${{ env.MIGRATOR_NAME }} >> .env
 
-          # Optional: if set to true, then the action won't cache or restore ~/go/pkg.
-          # skip-pkg-cache: true
+      - name: Upload .env file as artifact
+        uses: actions/upload-artifact@v4.3.4
+        with:
+          name: env-file
+          path: .env
 
-          # Optional: if set to true, then the action won't cache or restore ~/.cache/go-build.
-          # skip-build-cache: true
+  build_and_push_images_to_docker_hub:
+    name: Building and pushing images to DockerHub
+    runs-on: ubuntu-latest
+    needs:
+      - linter
+      - create_env_file
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4.1.7
 
-          # Optional: The mode to install golangci-lint. It can be 'binary' or 'goinstall'.
-          # install-mode: "goinstall"
+      - name: Download .env artifact
+        uses: actions/download-artifact@v4.1.8
+        with:
+          name: env-file
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.4.0
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3.2.0
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Push app image to DockerHub
+        uses: docker/build-push-action@v6.4.0
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/${{ env.APP_NAME }}:latest
+
+      - name: Push migrator image to DockerHub
+        uses: docker/build-push-action@v6.4.0
+        with:
+          context: .
+          file: migrator.Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/${{ env.MIGRATOR_NAME }}:latest
+
+  deploy_to_remote_server:
+    name: Deploying to remote server
+    runs-on: ubuntu-latest
+    needs: build_and_push_images_to_docker_hub
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4.1.7
+
+      - name: Download .env artifact
+        uses: actions/download-artifact@v4.1.8
+        with:
+          name: env-file
+
+      - name: Copy docker-compose file and .env to remote server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.PASSPHRASE }}
+          source: "${{ env.COMPOSE_FILE }}, .env"
+          target: "./app"
+          rm: true
+
+      - name: Executing remote ssh commands to deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          passphrase: ${{ secrets.PASSPHRASE }}
+          script: |
+            cd app
+            
+            docker compose -f ${{ env.COMPOSE_FILE }} down
+            docker system prune -a -f
+            docker image prune -a -f
+
+            docker compose -f ${{ env.COMPOSE_FILE }} up -d
