@@ -1,4 +1,4 @@
-![workflow](https://github.com/mikhailsoldatkin/chat-server/actions/workflows/go.yml/badge.svg)
+![workflow](https://github.com/mikhailsoldatkin/chat-server/actions/workflows/go.yaml/badge.svg)
 
 ### Try gRPC endpoints
 
