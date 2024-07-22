@@ -20,17 +20,18 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+// tables and fields names
 const (
-	id        = "id"
-	chatUsers = "chat_users"
-	chats     = "chats"
-	messages  = "messages"
-	chatID    = "chat_id"
-	userID    = "user_id"
-	createdAt = "created_at"
-	fromUser  = "from_user"
-	timestamp = "timestamp"
-	text      = "text"
+	ID        = "id"
+	ChatUsers = "chat_users"
+	Chats     = "chats"
+	Messages  = "messages"
+	ChatID    = "chat_id"
+	UserID    = "user_id"
+	CreatedAt = "created_at"
+	FromUser  = "from_user"
+	Timestamp = "timestamp"
+	Text      = "text"
 )
 
 type server struct {
@@ -56,7 +57,7 @@ func (s *server) recordExists(ctx context.Context, ID int64, table string) error
 // isUserInChat checks if a user is a member of a chat.
 func (s *server) isUserInChat(ctx context.Context, userID int64, chatID int64) error {
 	var exists bool
-	query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM %s WHERE chat_id=$1 AND user_id=$2)", chatUsers)
+	query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM %s WHERE chat_id=$1 AND user_id=$2)", ChatUsers)
 	err := s.pool.QueryRow(ctx, query, chatID, userID).Scan(&exists)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to check if user is in chat: %v", err)
@@ -81,9 +82,9 @@ func (s *server) Create(ctx context.Context, req *pb.CreateRequest) (*pb.CreateR
 		_ = tx.Rollback(ctx)
 	}(tr, ctx)
 
-	chatBuilder := sq.Insert(chats).
+	chatBuilder := sq.Insert(Chats).
 		PlaceholderFormat(sq.Dollar).
-		Columns(createdAt).
+		Columns(CreatedAt).
 		Values("NOW()").
 		Suffix("RETURNING id")
 
@@ -92,15 +93,15 @@ func (s *server) Create(ctx context.Context, req *pb.CreateRequest) (*pb.CreateR
 		return nil, status.Errorf(codes.Internal, "failed to build chat insert query: %v", err)
 	}
 
-	var chID int
-	err = tr.QueryRow(ctx, chatQuery, chatArgs...).Scan(&chID)
+	var chatID int
+	err = tr.QueryRow(ctx, chatQuery, chatArgs...).Scan(&chatID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to insert chat: %v", err)
 	}
 
-	chatUserBuilder := sq.Insert(chatUsers).
+	chatUserBuilder := sq.Insert(ChatUsers).
 		PlaceholderFormat(sq.Dollar).
-		Columns(chatID, userID)
+		Columns(ChatID, UserID)
 
 	for _, userID := range req.Users {
 		chatUserBuilder = chatUserBuilder.Values(chatID, userID)
@@ -121,15 +122,13 @@ func (s *server) Create(ctx context.Context, req *pb.CreateRequest) (*pb.CreateR
 		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
 	}
 
-	logger.Info("chat with ID %d created with users: %v", chatID, req.Users)
+	logger.Info("chat %d created with users: %v", chatID, req.Users)
 
-	return &pb.CreateResponse{Id: int64(chID)}, nil
+	return &pb.CreateResponse{Id: int64(chatID)}, nil
 }
 
 // Delete removes a chat by ID.
 func (s *server) Delete(ctx context.Context, req *pb.DeleteRequest) (*emptypb.Empty, error) {
-	chID := req.GetId()
-
 	tr, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to begin transaction: %v", err)
@@ -138,8 +137,9 @@ func (s *server) Delete(ctx context.Context, req *pb.DeleteRequest) (*emptypb.Em
 		_ = tr.Rollback(ctx)
 	}(tr, ctx)
 
-	chatUserDeleteBuilder := sq.Delete(chatUsers).
-		Where(sq.Eq{chatID: chID}).
+	chatID := req.GetId()
+	chatUserDeleteBuilder := sq.Delete(ChatUsers).
+		Where(sq.Eq{ChatID: chatID}).
 		PlaceholderFormat(sq.Dollar)
 
 	chatUserDeleteQuery, chatUserDeleteArgs, err := chatUserDeleteBuilder.ToSql()
@@ -154,8 +154,8 @@ func (s *server) Delete(ctx context.Context, req *pb.DeleteRequest) (*emptypb.Em
 
 	logger.Info("users deleted from chat %d", chatID)
 
-	chatDeleteBuilder := sq.Delete(chats).
-		Where(sq.Eq{id: chatID}).
+	chatDeleteBuilder := sq.Delete(Chats).
+		Where(sq.Eq{ID: chatID}).
 		PlaceholderFormat(sq.Dollar)
 
 	chatDeleteQuery, chatDeleteArgs, err := chatDeleteBuilder.ToSql()
@@ -180,23 +180,23 @@ func (s *server) Delete(ctx context.Context, req *pb.DeleteRequest) (*emptypb.Em
 
 // SendMessage handles sending a message to a chat from a user.
 func (s *server) SendMessage(ctx context.Context, req *pb.SendMessageRequest) (*emptypb.Empty, error) {
-	chID := req.GetChatId()
+	chatID := req.GetChatId()
 	userID := req.GetFromUser()
 	messageText := req.GetText()
 
-	if err := s.recordExists(ctx, chID, chats); err != nil {
+	if err := s.recordExists(ctx, chatID, Chats); err != nil {
 		return nil, err
 	}
 
 	// check user existence
 
-	if err := s.isUserInChat(ctx, userID, chID); err != nil {
+	if err := s.isUserInChat(ctx, userID, chatID); err != nil {
 		return nil, err
 	}
 
-	messageBuilder := sq.Insert(messages).
+	messageBuilder := sq.Insert(Messages).
 		PlaceholderFormat(sq.Dollar).
-		Columns(chatID, fromUser, text, timestamp).
+		Columns(ChatID, FromUser, Text, Timestamp).
 		Values(chatID, userID, messageText, time.Now().UTC()).
 		Suffix("RETURNING id")
 
@@ -211,7 +211,7 @@ func (s *server) SendMessage(ctx context.Context, req *pb.SendMessageRequest) (*
 		return nil, status.Errorf(codes.Internal, "failed to send message: %v", err)
 	}
 
-	logger.Info("message %d sent to chat %d by user %d", messageID, chatID, userID)
+	logger.Info("user %d sent message %d to chat %d", userID, messageID, chatID)
 
 	return &emptypb.Empty{}, nil
 }

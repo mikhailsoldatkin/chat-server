@@ -11,8 +11,8 @@ on:
       - '**/README.md'
 
 env:
-  APP_NAME: chat
-  MIGRATOR_NAME: chat_migrator
+  APP_NAME: chat_server
+  MIGRATOR_NAME: chat_server_migrator
   COMPOSE_FILE: docker-compose-prod.yaml
   DB_HOST: db
   DB_PORT: 5432
