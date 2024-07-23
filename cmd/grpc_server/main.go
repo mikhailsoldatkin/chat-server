@@ -20,18 +20,17 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// tables and fields names
 const (
-	ID        = "id"
-	ChatUsers = "chat_users"
-	Chats     = "chats"
-	Messages  = "messages"
-	ChatID    = "chat_id"
-	UserID    = "user_id"
-	CreatedAt = "created_at"
-	FromUser  = "from_user"
-	Timestamp = "timestamp"
-	Text      = "text"
+	columnID        = "id"
+	tableChatUsers  = "chat_users"
+	tableChats      = "chats"
+	tableMessages   = "messages"
+	columnChatID    = "chat_id"
+	columnUserID    = "user_id"
+	columnCreatedAt = "created_at"
+	columnFromUser  = "from_user"
+	columnTimestamp = "timestamp"
+	columnText      = "text"
 )
 
 type server struct {
@@ -57,13 +56,16 @@ func (s *server) recordExists(ctx context.Context, ID int64, table string) error
 // isUserInChat checks if a user is a member of a chat.
 func (s *server) isUserInChat(ctx context.Context, userID int64, chatID int64) error {
 	var exists bool
-	query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM %s WHERE chat_id=$1 AND user_id=$2)", ChatUsers)
+	query := fmt.Sprintf(
+		"SELECT EXISTS(SELECT 1 FROM %s WHERE %s=$1 AND %s=$2)",
+		tableChatUsers, columnChatID, columnUserID,
+	)
 	err := s.pool.QueryRow(ctx, query, chatID, userID).Scan(&exists)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to check if user is in chat: %v", err)
 	}
 	if !exists {
-		return status.Errorf(codes.InvalidArgument, "user %d is not a participant of chat %d", userID, chatID)
+		return status.Errorf(codes.InvalidArgument, "user %d is not a member of chat %d", userID, chatID)
 	}
 	return nil
 }
@@ -82,9 +84,9 @@ func (s *server) Create(ctx context.Context, req *pb.CreateRequest) (*pb.CreateR
 		_ = tx.Rollback(ctx)
 	}(tr, ctx)
 
-	chatBuilder := sq.Insert(Chats).
+	chatBuilder := sq.Insert(tableChats).
 		PlaceholderFormat(sq.Dollar).
-		Columns(CreatedAt).
+		Columns(columnCreatedAt).
 		Values("NOW()").
 		Suffix("RETURNING id")
 
@@ -99,9 +101,9 @@ func (s *server) Create(ctx context.Context, req *pb.CreateRequest) (*pb.CreateR
 		return nil, status.Errorf(codes.Internal, "failed to insert chat: %v", err)
 	}
 
-	chatUserBuilder := sq.Insert(ChatUsers).
+	chatUserBuilder := sq.Insert(tableChatUsers).
 		PlaceholderFormat(sq.Dollar).
-		Columns(ChatID, UserID)
+		Columns(columnChatID, columnUserID)
 
 	for _, userID := range req.Users {
 		chatUserBuilder = chatUserBuilder.Values(chatID, userID)
@@ -138,24 +140,24 @@ func (s *server) Delete(ctx context.Context, req *pb.DeleteRequest) (*emptypb.Em
 	}(tr, ctx)
 
 	chatID := req.GetId()
-	chatUserDeleteBuilder := sq.Delete(ChatUsers).
-		Where(sq.Eq{ChatID: chatID}).
+	chatUsersDeleteBuilder := sq.Delete(tableChatUsers).
+		Where(sq.Eq{columnChatID: chatID}).
 		PlaceholderFormat(sq.Dollar)
 
-	chatUserDeleteQuery, chatUserDeleteArgs, err := chatUserDeleteBuilder.ToSql()
+	chatUsersDeleteQuery, chatUsersDeleteArgs, err := chatUsersDeleteBuilder.ToSql()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to build chat_users delete query: %v", err)
 	}
 
-	_, err = tr.Exec(ctx, chatUserDeleteQuery, chatUserDeleteArgs...)
+	_, err = tr.Exec(ctx, chatUsersDeleteQuery, chatUsersDeleteArgs...)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete users from chat_users: %v", err)
 	}
 
 	logger.Info("users deleted from chat %d", chatID)
 
-	chatDeleteBuilder := sq.Delete(Chats).
-		Where(sq.Eq{ID: chatID}).
+	chatDeleteBuilder := sq.Delete(tableChats).
+		Where(sq.Eq{columnID: chatID}).
 		PlaceholderFormat(sq.Dollar)
 
 	chatDeleteQuery, chatDeleteArgs, err := chatDeleteBuilder.ToSql()
@@ -184,7 +186,7 @@ func (s *server) SendMessage(ctx context.Context, req *pb.SendMessageRequest) (*
 	userID := req.GetFromUser()
 	messageText := req.GetText()
 
-	if err := s.recordExists(ctx, chatID, Chats); err != nil {
+	if err := s.recordExists(ctx, chatID, tableChats); err != nil {
 		return nil, err
 	}
 
@@ -194,9 +196,9 @@ func (s *server) SendMessage(ctx context.Context, req *pb.SendMessageRequest) (*
 		return nil, err
 	}
 
-	messageBuilder := sq.Insert(Messages).
+	messageBuilder := sq.Insert(tableMessages).
 		PlaceholderFormat(sq.Dollar).
-		Columns(ChatID, FromUser, Text, Timestamp).
+		Columns(columnChatID, columnFromUser, columnText, columnTimestamp).
 		Values(chatID, userID, messageText, time.Now().UTC()).
 		Suffix("RETURNING id")
 
@@ -235,7 +237,7 @@ func main() {
 	reflection.Register(s)
 	pb.RegisterChatV1Server(s, &server{pool: pool})
 
-	logger.Info("%v server listening at %v", cfg.AppName, lis.Addr())
+	logger.Info("%v listening at %v", cfg.AppName, lis.Addr())
 
 	if err = s.Serve(lis); err != nil {
 		logger.Fatal("failed to serve: %v", err)
