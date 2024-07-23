@@ -1,0 +1,30 @@
+services:
+
+  app:
+    image: ${DOCKER_USERNAME}/${APP_NAME}:latest
+    container_name: ${APP_NAME}
+    ports:
+      - ${GRPC_PORT}:${GRPC_PORT}
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16.3-alpine3.20
+    container_name: ${APP_NAME}_${DB_HOST}
+    ports:
+      - ${DB_HOST_PORT}:${DB_PORT}
+    env_file:
+      - .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+
+  migrator:
+    image: ${DOCKER_USERNAME}/${MIGRATOR_NAME}:latest
+    container_name: ${MIGRATOR_NAME}
+    restart: on-failure
+
+volumes:
+  pgdata:
