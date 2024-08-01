@@ -1,3 +1,4 @@
+include .env
 LOCAL_BIN:=$(CURDIR)/bin
 CHAT_API:=chat_v1
 
@@ -26,3 +27,12 @@ generate-chat-api:
 	--go-grpc_out=pkg/$(CHAT_API) --go-grpc_opt=paths=source_relative \
 	--plugin=protoc-gen-go-grpc=bin/protoc-gen-go-grpc \
 	api/$(CHAT_API)/chat.proto
+
+local-migration-status:
+	$(LOCAL_BIN)/goose -dir ${MIGRATIONS_DIR} postgres ${PG_DSN} status -v
+
+local-migration-up:
+	$(LOCAL_BIN)/goose -dir ${MIGRATIONS_DIR} postgres ${PG_DSN} up -v
+
+local-migration-down:
+	$(LOCAL_BIN)/goose -dir ${MIGRATIONS_DIR} postgres ${PG_DSN} down -v

@@ -6,7 +6,9 @@ import (
 
 // Delete removes a chat from the system by ID.
 func (s *serv) Delete(ctx context.Context, id int64) error {
-	return s.txManager.ReadCommitted(ctx, func(ctx context.Context) error {
-		return s.chatRepository.Delete(ctx, id)
-	})
+	err := s.chatRepository.Delete(ctx, id)
+	if err != nil {
+		return err
+	}
+	return nil
 }

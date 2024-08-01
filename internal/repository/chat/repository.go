@@ -2,15 +2,16 @@ package chat
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/jackc/pgx/v4"
 	"github.com/mikhailsoldatkin/chat-server/internal/client/db"
+	"github.com/mikhailsoldatkin/chat-server/internal/customerrors"
 	"github.com/mikhailsoldatkin/chat-server/internal/repository"
 	pb "github.com/mikhailsoldatkin/chat-server/pkg/chat_v1"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 const (
@@ -24,6 +25,7 @@ const (
 	columnFromUser  = "from_user"
 	columnTimestamp = "timestamp"
 	columnText      = "text"
+	chatEntity      = "chat"
 )
 
 type repo struct {
@@ -35,32 +37,51 @@ func NewRepository(db db.Client) repository.ChatRepository {
 	return &repo{db: db}
 }
 
+// chatExists checks that chat exists.
+func (r *repo) chatExists(ctx context.Context, id int64) error {
+	query := fmt.Sprintf("SELECT 1 FROM %s WHERE %s=$1", tableChats, columnID)
+	q := db.Query{
+		Name:     "chat_repository.chatExists",
+		QueryRaw: query,
+	}
+
+	var exists int
+	err := r.db.DB().QueryRowContext(ctx, q, id).Scan(&exists)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return customerrors.NewNotFoundError(chatEntity, id)
+		}
+		return err
+	}
+
+	return nil
+}
+
 // isUserInChat checks if a user is a member of a chat.
 func (r *repo) isUserInChat(ctx context.Context, userID int64, chatID int64) error {
-	var exists bool
 	query := fmt.Sprintf(
-		"SELECT EXISTS(SELECT 1 FROM %s WHERE %s=$1 AND %s=$2)",
+		"SELECT 1 FROM %s WHERE %s=$1 AND %s=$2",
 		tableChatUsers, columnChatID, columnUserID,
 	)
 	q := db.Query{
 		Name:     "chat_repository.isUserInChat",
 		QueryRaw: query,
 	}
-	err := r.db.DB().ScanOneContext(ctx, &exists, q, chatID, userID)
+
+	var exists int
+	err := r.db.DB().QueryRowContext(ctx, q, chatID, userID).Scan(&exists)
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to check that chat is in chat: %v", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return customerrors.NewUserNotInChatError(userID, chatID)
+		}
+		return err
 	}
-	if !exists {
-		return status.Errorf(codes.InvalidArgument, "chat %d is not a member of chat %d", userID, chatID)
-	}
+
 	return nil
 }
 
 // Create inserts a new chat into the database.
 func (r *repo) Create(ctx context.Context, users []int64) (int64, error) {
-	if len(users) == 0 {
-		return 0, status.Errorf(codes.InvalidArgument, "no users provided for the chat")
-	}
 	chatBuilder := sq.Insert(tableChats).
 		PlaceholderFormat(sq.Dollar).
 		Columns(columnCreatedAt).
@@ -69,7 +90,7 @@ func (r *repo) Create(ctx context.Context, users []int64) (int64, error) {
 
 	chatQuery, chatArgs, err := chatBuilder.ToSql()
 	if err != nil {
-		return 0, status.Errorf(codes.Internal, "failed to build create chat query: %v", err)
+		return 0, err
 	}
 
 	qChat := db.Query{
@@ -79,7 +100,7 @@ func (r *repo) Create(ctx context.Context, users []int64) (int64, error) {
 	var chatID int64
 	err = r.db.DB().ScanOneContext(ctx, &chatID, qChat, chatArgs...)
 	if err != nil {
-		return 0, status.Errorf(codes.Internal, "failed to execute create chat query: %v", err)
+		return 0, err
 	}
 
 	chatUsersBuilder := sq.Insert(tableChatUsers).
@@ -92,7 +113,7 @@ func (r *repo) Create(ctx context.Context, users []int64) (int64, error) {
 
 	chatUsersQuery, chatUsersArgs, err := chatUsersBuilder.ToSql()
 	if err != nil {
-		return 0, status.Errorf(codes.Internal, "failed to build query inserting users in chat: %v", err)
+		return 0, err
 	}
 
 	qChatUsers := db.Query{
@@ -102,7 +123,7 @@ func (r *repo) Create(ctx context.Context, users []int64) (int64, error) {
 
 	_, err = r.db.DB().ExecContext(ctx, qChatUsers, chatUsersArgs...)
 	if err != nil {
-		return 0, status.Errorf(codes.Internal, "failed to execute query inserting users in chat: %v", err)
+		return 0, err
 	}
 
 	return chatID, nil
@@ -116,7 +137,7 @@ func (r *repo) Delete(ctx context.Context, id int64) error {
 
 	chatUsersDeleteQuery, chatUsersDeleteArgs, err := chatUsersDeleteBuilder.ToSql()
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to build delet users from chat query: %v", err)
+		return err
 	}
 
 	qChatUsers := db.Query{
@@ -126,7 +147,7 @@ func (r *repo) Delete(ctx context.Context, id int64) error {
 
 	_, err = r.db.DB().ExecContext(ctx, qChatUsers, chatUsersDeleteArgs...)
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed execute delet users from chat query: %v", err)
+		return err
 	}
 
 	chatDeleteBuilder := sq.Delete(tableChats).
@@ -135,7 +156,7 @@ func (r *repo) Delete(ctx context.Context, id int64) error {
 
 	chatDeleteQuery, chatDeleteArgs, err := chatDeleteBuilder.ToSql()
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to build delete chat query: %v", err)
+		return err
 	}
 
 	qChat := db.Query{
@@ -145,19 +166,17 @@ func (r *repo) Delete(ctx context.Context, id int64) error {
 
 	_, err = r.db.DB().ExecContext(ctx, qChat, chatDeleteArgs...)
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to execute delete chat query: %v", err)
+		return err
 	}
 
 	return nil
 }
 
-// SendMessage handles sending a message from a user to a chat.
+// SendMessage handles sending a message from a user to a chat, creates a message in database.
 func (r *repo) SendMessage(ctx context.Context, req *pb.SendMessageRequest) error {
-	if err := r.db.DB().RecordExists(ctx, req.GetChatId(), tableChats); err != nil {
+	if err := r.chatExists(ctx, req.GetChatId()); err != nil {
 		return err
 	}
-
-	// check chat existence
 
 	if err := r.isUserInChat(ctx, req.GetFromUser(), req.GetChatId()); err != nil {
 		return err
@@ -170,7 +189,7 @@ func (r *repo) SendMessage(ctx context.Context, req *pb.SendMessageRequest) erro
 
 	query, args, err := builder.ToSql()
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to build send message query: %v", err)
+		return err
 	}
 
 	q := db.Query{
@@ -180,7 +199,7 @@ func (r *repo) SendMessage(ctx context.Context, req *pb.SendMessageRequest) erro
 
 	_, err = r.db.DB().ExecContext(ctx, q, args...)
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed execute send message query: %v", err)
+		return err
 	}
 
 	return nil

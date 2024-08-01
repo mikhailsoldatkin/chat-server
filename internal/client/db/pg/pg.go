@@ -2,7 +2,6 @@ package pg
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/georgysavva/scany/pgxscan"
@@ -11,8 +10,6 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/mikhailsoldatkin/chat-server/internal/client/db"
 	"github.com/mikhailsoldatkin/chat-server/internal/client/db/prettier"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type key string
@@ -46,25 +43,6 @@ func (p *pg) ScanAllContext(ctx context.Context, dest any, q db.Query, args ...a
 	}
 
 	return pgxscan.ScanAll(dest, rows)
-}
-
-// RecordExists checks if a record with a given ID exists in a database table.
-func (p *pg) RecordExists(ctx context.Context, id int64, table string) error {
-	var exists bool
-	notFoundMsg := fmt.Sprintf("record with ID %d not found in %s table", id, table)
-	query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM %s WHERE id=%d)", table, id)
-	q := db.Query{
-		Name:     "RecordExists",
-		QueryRaw: query,
-	}
-	err := p.ScanOneContext(ctx, &exists, q)
-	if err != nil {
-		return status.Errorf(codes.Internal, "failed to check existence: %v", err)
-	}
-	if !exists {
-		return status.Errorf(codes.NotFound, notFoundMsg)
-	}
-	return nil
 }
 
 // ExecContext executes a query without returning any rows and returns the command tag and error if any.

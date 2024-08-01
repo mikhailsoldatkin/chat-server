@@ -50,7 +50,6 @@ type QueryExecer interface {
 	ExecContext(ctx context.Context, q Query, args ...any) (pgconn.CommandTag, error)
 	QueryContext(ctx context.Context, q Query, args ...any) (pgx.Rows, error)
 	QueryRowContext(ctx context.Context, q Query, args ...any) pgx.Row
-	RecordExists(ctx context.Context, id int64, table string) error
 }
 
 // Pinger is an interface for checking the connection to the database.
