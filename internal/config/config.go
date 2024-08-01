@@ -2,12 +2,13 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/joho/godotenv"
 )
+
+const envPath = "./.env"
 
 // DatabaseConfig represents the configuration for the database.
 type DatabaseConfig struct {
@@ -31,22 +32,19 @@ type Config struct {
 	GRPC     GRPCConfig
 }
 
-// MustLoad reads application configuration from .env file
-func MustLoad() *Config {
-	envPath := "./.env"
-
+// Load reads configuration from .env file.
+func Load() (*Config, error) {
 	if _, err := os.Stat(envPath); os.IsNotExist(err) {
-		log.Fatal(".env file does not exist in project's root")
+		return nil, fmt.Errorf(".env file does not exist in project's root")
 	}
 
 	if err := godotenv.Load(envPath); err != nil {
-		log.Fatalf(".env file does not exist or cannot be read: %s", envPath)
+		return nil, fmt.Errorf("error loading .env file: %w", err)
 	}
 
 	var cfg Config
-
 	if err := cleanenv.ReadEnv(&cfg); err != nil {
-		log.Fatalf("cannot read config from .env: %s", err)
+		return nil, fmt.Errorf("cannot read config from environment variables: %w", err)
 	}
 
 	cfg.Database.PostgresDSN = fmt.Sprintf(
@@ -58,5 +56,5 @@ func MustLoad() *Config {
 		cfg.Database.PostgresPassword,
 	)
 
-	return &cfg
+	return &cfg, nil
 }
