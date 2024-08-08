@@ -15,6 +15,8 @@ require (
 require (
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/georgysavva/scany v1.2.2 // indirect
+	github.com/BurntSushi/toml v1.2.1 // indirect
+	github.com/georgysavva/scany v1.2.2 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.14.3 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
