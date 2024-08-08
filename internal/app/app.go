@@ -10,9 +10,9 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/mikhailsoldatkin/chat-server/internal/closer"
 	"github.com/mikhailsoldatkin/chat-server/internal/config"
 	pb "github.com/mikhailsoldatkin/chat-server/pkg/chat_v1"
+	"github.com/mikhailsoldatkin/platform_common/pkg/closer"
 )
 
 // App represents the application with its dependencies and GRPC server.

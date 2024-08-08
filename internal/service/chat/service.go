@@ -1,9 +1,9 @@
 package chat
 
 import (
-	"github.com/mikhailsoldatkin/chat-server/internal/client/db"
 	"github.com/mikhailsoldatkin/chat-server/internal/repository"
 	"github.com/mikhailsoldatkin/chat-server/internal/service"
+	"github.com/mikhailsoldatkin/platform_common/pkg/db"
 )
 
 var _ service.ChatService = (*serv)(nil)
