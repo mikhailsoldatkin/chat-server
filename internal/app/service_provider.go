@@ -5,16 +5,16 @@ import (
 	"log"
 
 	"github.com/mikhailsoldatkin/chat-server/internal/api/chat"
-	"github.com/mikhailsoldatkin/chat-server/internal/client/db"
-	"github.com/mikhailsoldatkin/chat-server/internal/client/db/pg"
-	"github.com/mikhailsoldatkin/chat-server/internal/client/db/transaction"
 	chatRepository "github.com/mikhailsoldatkin/chat-server/internal/repository/chat"
 	"github.com/mikhailsoldatkin/chat-server/internal/service"
 	chatService "github.com/mikhailsoldatkin/chat-server/internal/service/chat"
+	"github.com/mikhailsoldatkin/platform_common/pkg/db"
+	"github.com/mikhailsoldatkin/platform_common/pkg/db/pg"
+	"github.com/mikhailsoldatkin/platform_common/pkg/db/transaction"
 
-	"github.com/mikhailsoldatkin/chat-server/internal/closer"
 	"github.com/mikhailsoldatkin/chat-server/internal/config"
 	"github.com/mikhailsoldatkin/chat-server/internal/repository"
+	"github.com/mikhailsoldatkin/platform_common/pkg/closer"
 )
 
 type serviceProvider struct {

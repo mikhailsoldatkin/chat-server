@@ -8,10 +8,10 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v4"
-	"github.com/mikhailsoldatkin/chat-server/internal/client/db"
 	"github.com/mikhailsoldatkin/chat-server/internal/customerrors"
 	"github.com/mikhailsoldatkin/chat-server/internal/repository"
 	pb "github.com/mikhailsoldatkin/chat-server/pkg/chat_v1"
+	"github.com/mikhailsoldatkin/platform_common/pkg/db"
 )
 
 const (
