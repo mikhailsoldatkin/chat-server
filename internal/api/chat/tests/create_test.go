@@ -62,7 +62,7 @@ func TestCreate(t *testing.T) {
 			err:  nil,
 			chatServiceMock: func(mc *minimock.Controller) service.ChatService {
 				mock := serviceMocks.NewChatServiceMock(mc)
-				mock.CreateMock.Set(func(_ context.Context, users []int64) (int64, error) {
+				mock.CreateMock.Set(func(_ context.Context, _ []int64) (int64, error) {
 					require.Equal(t, wantChat.ID, id)
 					require.Equal(t, wantChatUser.ChatID, id)
 					require.Equal(t, wantChatUser.UserID, userID)
@@ -81,7 +81,7 @@ func TestCreate(t *testing.T) {
 			err:  customerrors.ConvertError(wantErr),
 			chatServiceMock: func(mc *minimock.Controller) service.ChatService {
 				mock := serviceMocks.NewChatServiceMock(mc)
-				mock.CreateMock.Set(func(_ context.Context, users []int64) (int64, error) {
+				mock.CreateMock.Set(func(_ context.Context, _ []int64) (int64, error) {
 					return 0, wantErr
 				})
 				return mock
