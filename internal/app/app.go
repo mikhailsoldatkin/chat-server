@@ -76,8 +76,23 @@ func (a *App) initServiceProvider(_ context.Context) error {
 }
 
 func (a *App) initGRPCServer(ctx context.Context) error {
-	a.grpcServer = grpc.NewServer(grpc.Creds(insecure.NewCredentials()))
+	//creds, err := credentials.NewServerTLSFromFile("cert/service.pem", "cert/service.key")
+	//if err != nil {
+	//	log.Fatalf("failed to load TLS keys: %v", err)
+	//}
+	//
+	//a.grpcServer = grpc.NewServer(
+	//	grpc.Creds(creds),
+	//	grpc.UnaryInterceptor(interceptor.Interceptor(a.serviceProvider.AccessClient())),
+	//)
+
+	a.grpcServer = grpc.NewServer(
+		grpc.Creds(insecure.NewCredentials()),
+		//grpc.UnaryInterceptor(interceptor.Interceptor),
+	)
+
 	reflection.Register(a.grpcServer)
+
 	pb.RegisterChatV1Server(a.grpcServer, a.serviceProvider.ChatImplementation(ctx))
 
 	return nil

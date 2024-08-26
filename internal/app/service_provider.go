@@ -4,25 +4,29 @@ import (
 	"context"
 	"log"
 
+	accessProto "github.com/mikhailsoldatkin/auth/pkg/access_v1"
 	"github.com/mikhailsoldatkin/chat-server/internal/api/chat"
+	"github.com/mikhailsoldatkin/chat-server/internal/config"
+	"github.com/mikhailsoldatkin/chat-server/internal/repository"
 	chatRepository "github.com/mikhailsoldatkin/chat-server/internal/repository/chat"
 	"github.com/mikhailsoldatkin/chat-server/internal/service"
 	chatService "github.com/mikhailsoldatkin/chat-server/internal/service/chat"
+	"github.com/mikhailsoldatkin/platform_common/pkg/closer"
 	"github.com/mikhailsoldatkin/platform_common/pkg/db"
 	"github.com/mikhailsoldatkin/platform_common/pkg/db/pg"
 	"github.com/mikhailsoldatkin/platform_common/pkg/db/transaction"
-
-	"github.com/mikhailsoldatkin/chat-server/internal/config"
-	"github.com/mikhailsoldatkin/chat-server/internal/repository"
-	"github.com/mikhailsoldatkin/platform_common/pkg/closer"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type serviceProvider struct {
-	config             *config.Config
-	dbClient           db.Client
-	txManager          db.TxManager
-	chatRepository     repository.ChatRepository
-	chatService        service.ChatService
+	config         *config.Config
+	dbClient       db.Client
+	txManager      db.TxManager
+	chatRepository repository.ChatRepository
+	chatService    service.ChatService
+	accessClient   accessProto.AccessV1Client
+
 	chatImplementation *chat.Implementation
 }
 
@@ -88,9 +92,39 @@ func (s *serviceProvider) ChatService(ctx context.Context) service.ChatService {
 	return s.chatService
 }
 
+func (s *serviceProvider) AccessClient() accessProto.AccessV1Client {
+	if s.accessClient == nil {
+		//creds, err := credentials.NewClientTLSFromFile("cert/service.pem", "")
+		////creds, err := credentials.NewClientTLSFromFile("cert/ca.cert", "")
+		//if err != nil {
+		//	log.Fatalf("failed to process the credentials: %v", err)
+		//}
+		address := "localhost:50051"
+		//conn, err := grpc.NewClient(
+		//	address,
+		//	grpc.WithTransportCredentials(creds),
+		//)
+		conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		closer.Add(conn.Close)
+
+		if err != nil {
+			log.Fatalf("failed to create access client: %v", err)
+		}
+
+		s.accessClient = accessProto.NewAccessV1Client(conn)
+	}
+
+	log.Printf("s.accessClient=%v", s.accessClient)
+
+	return s.accessClient
+}
+
 func (s *serviceProvider) ChatImplementation(ctx context.Context) *chat.Implementation {
 	if s.chatImplementation == nil {
-		s.chatImplementation = chat.NewImplementation(s.ChatService(ctx))
+		s.chatImplementation = chat.NewImplementation(
+			s.ChatService(ctx),
+			s.AccessClient(),
+		)
 	}
 
 	return s.chatImplementation
