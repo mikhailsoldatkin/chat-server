@@ -13,7 +13,7 @@ import (
 
 const (
 	address     = "localhost:50051"
-	accessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MjQ3ODU0NjYsInVzZXJuYW1lIjoibWlzaGEiLCJyb2xlIjoiQURNSU4ifQ.Fog-4VXMCrFeaXInZojkdZ9lp5Y1P_-ae5sANn1tiMg"
+	accessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MjQ4NTA3OTgsInVzZXJuYW1lIjoibWlzaGEiLCJyb2xlIjoiQURNSU4ifQ.XoripxJ4V3KDBVbSmC0FYdGTDm77oseJeTH1WoNzDsM"
 )
 
 func main() {
@@ -34,7 +34,7 @@ func main() {
 	md := metadata.New(map[string]string{"Authorization": "Bearer " + accessToken})
 	ctx = metadata.NewOutgoingContext(ctx, md)
 
-	_, err = c.Check(ctx, &pbAccess.CheckRequest{EndpointAddress: "/user_v1.UserV1/Get"})
+	_, err = c.Check(ctx, &pbAccess.CheckRequest{EndpointAddress: "/chat_v1.ChatV1/Create"})
 	if err != nil {
 		log.Fatalf("failed to Check(): %v", err)
 	}

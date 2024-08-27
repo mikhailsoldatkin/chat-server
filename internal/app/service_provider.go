@@ -16,7 +16,7 @@ import (
 	"github.com/mikhailsoldatkin/platform_common/pkg/db/pg"
 	"github.com/mikhailsoldatkin/platform_common/pkg/db/transaction"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 )
 
 type serviceProvider struct {
@@ -94,27 +94,20 @@ func (s *serviceProvider) ChatService(ctx context.Context) service.ChatService {
 
 func (s *serviceProvider) AccessClient() accessProto.AccessV1Client {
 	if s.accessClient == nil {
-		//creds, err := credentials.NewClientTLSFromFile("cert/service.pem", "")
-		////creds, err := credentials.NewClientTLSFromFile("cert/ca.cert", "")
-		//if err != nil {
-		//	log.Fatalf("failed to process the credentials: %v", err)
-		//}
-		address := "localhost:50051"
-		//conn, err := grpc.NewClient(
-		//	address,
-		//	grpc.WithTransportCredentials(creds),
-		//)
-		conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		closer.Add(conn.Close)
 
+		creds, err := credentials.NewClientTLSFromFile("cert/service.pem", "")
 		if err != nil {
-			log.Fatalf("failed to create access client: %v", err)
+			log.Fatalf("could not process the credentials: %v", err)
 		}
+
+		conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(creds))
+		if err != nil {
+			log.Fatalf("failed to connect to server: %v", err)
+		}
+		closer.Add(conn.Close)
 
 		s.accessClient = accessProto.NewAccessV1Client(conn)
 	}
-
-	log.Printf("s.accessClient=%v", s.accessClient)
 
 	return s.accessClient
 }

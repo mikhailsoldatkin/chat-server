@@ -13,11 +13,11 @@
 # Vendor directory
 /vendor/
 
-# Private keys
-cert/*.key
-
-cert/*.csr
-# Certificate Signing Request files
-
-# CA serial number file
-cert/*.srl
+## Private keys
+#cert/*.key
+#
+#cert/*.csr
+## Certificate Signing Request files
+#
+## CA serial number file
+#cert/*.srl

@@ -6,8 +6,9 @@ import (
 	"log"
 	"net"
 
+	"github.com/mikhailsoldatkin/chat-server/internal/interceptor"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/mikhailsoldatkin/chat-server/internal/config"
@@ -76,19 +77,14 @@ func (a *App) initServiceProvider(_ context.Context) error {
 }
 
 func (a *App) initGRPCServer(ctx context.Context) error {
-	//creds, err := credentials.NewServerTLSFromFile("cert/service.pem", "cert/service.key")
-	//if err != nil {
-	//	log.Fatalf("failed to load TLS keys: %v", err)
-	//}
-	//
-	//a.grpcServer = grpc.NewServer(
-	//	grpc.Creds(creds),
-	//	grpc.UnaryInterceptor(interceptor.Interceptor(a.serviceProvider.AccessClient())),
-	//)
+	creds, err := credentials.NewServerTLSFromFile("cert/service.pem", "cert/service.key")
+	if err != nil {
+		log.Fatalf("failed to load TLS keys: %v", err)
+	}
 
 	a.grpcServer = grpc.NewServer(
-		grpc.Creds(insecure.NewCredentials()),
-		//grpc.UnaryInterceptor(interceptor.Interceptor),
+		grpc.Creds(creds),
+		grpc.UnaryInterceptor(interceptor.Interceptor(a.serviceProvider.AccessClient())),
 	)
 
 	reflection.Register(a.grpcServer)
