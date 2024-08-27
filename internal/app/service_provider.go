@@ -93,19 +93,20 @@ func (s *serviceProvider) ChatService(ctx context.Context) service.ChatService {
 }
 
 func (s *serviceProvider) AccessClient() accessProto.AccessV1Client {
-	creds, err := credentials.NewClientTLSFromFile("cert/service.pem", "")
+	creds, err := credentials.NewClientTLSFromFile("cert/ca.cert", "")
 	if err != nil {
-		log.Fatalf("could not process the credentials: %v", err)
+		log.Fatalf("failed to process credentials: %v", err)
 	}
 
 	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(creds))
 	if err != nil {
 		log.Fatalf("failed to create connection: %v", err)
 	}
-
 	closer.Add(conn.Close)
 
-	return accessProto.NewAccessV1Client(conn)
+	client := accessProto.NewAccessV1Client(conn)
+
+	return client
 }
 
 func (s *serviceProvider) ChatImplementation(ctx context.Context) *chat.Implementation {

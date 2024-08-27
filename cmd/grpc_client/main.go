@@ -13,11 +13,11 @@ import (
 
 const (
 	address     = "localhost:50051"
-	accessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MjQ4NTA3OTgsInVzZXJuYW1lIjoibWlzaGEiLCJyb2xlIjoiQURNSU4ifQ.XoripxJ4V3KDBVbSmC0FYdGTDm77oseJeTH1WoNzDsM"
+	accessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MjQ4NzE0NDEsInVzZXJuYW1lIjoibWlzaGEiLCJyb2xlIjoiQURNSU4ifQ.1qL9IyKwY-frwAnzjp6bl1bxsHH94K7DFSRmxBafDPU"
 )
 
 func main() {
-	creds, err := credentials.NewClientTLSFromFile("cert/service.pem", "")
+	creds, err := credentials.NewClientTLSFromFile("cert/ca.cert", "")
 	if err != nil {
 		log.Fatalf("could not process the credentials: %v", err)
 	}
