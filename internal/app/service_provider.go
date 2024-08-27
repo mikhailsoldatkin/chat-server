@@ -25,7 +25,7 @@ type serviceProvider struct {
 	txManager      db.TxManager
 	chatRepository repository.ChatRepository
 	chatService    service.ChatService
-	accessClient   accessProto.AccessV1Client
+	//accessClient   accessProto.AccessV1Client
 
 	chatImplementation *chat.Implementation
 }
@@ -93,31 +93,24 @@ func (s *serviceProvider) ChatService(ctx context.Context) service.ChatService {
 }
 
 func (s *serviceProvider) AccessClient() accessProto.AccessV1Client {
-	if s.accessClient == nil {
-
-		creds, err := credentials.NewClientTLSFromFile("cert/service.pem", "")
-		if err != nil {
-			log.Fatalf("could not process the credentials: %v", err)
-		}
-
-		conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(creds))
-		if err != nil {
-			log.Fatalf("failed to connect to server: %v", err)
-		}
-		closer.Add(conn.Close)
-
-		s.accessClient = accessProto.NewAccessV1Client(conn)
+	creds, err := credentials.NewClientTLSFromFile("cert/service.pem", "")
+	if err != nil {
+		log.Fatalf("could not process the credentials: %v", err)
 	}
 
-	return s.accessClient
+	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(creds))
+	if err != nil {
+		log.Fatalf("failed to create connection: %v", err)
+	}
+
+	closer.Add(conn.Close)
+
+	return accessProto.NewAccessV1Client(conn)
 }
 
 func (s *serviceProvider) ChatImplementation(ctx context.Context) *chat.Implementation {
 	if s.chatImplementation == nil {
-		s.chatImplementation = chat.NewImplementation(
-			s.ChatService(ctx),
-			s.AccessClient(),
-		)
+		s.chatImplementation = chat.NewImplementation(s.ChatService(ctx))
 	}
 
 	return s.chatImplementation
