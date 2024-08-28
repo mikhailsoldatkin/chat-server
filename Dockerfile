@@ -8,7 +8,7 @@ RUN apt-get update &&  \
 
 COPY . .
 
-RUN #go mod download
+RUN go mod download
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o chat_server ./cmd/grpc_server/main.go
 

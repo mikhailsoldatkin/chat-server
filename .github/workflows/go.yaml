@@ -11,13 +11,17 @@ on:
       - '**/README.md'
 
 env:
+  GO_VERSION: 1.22
   APP_NAME: chat_server
-  MIGRATOR_NAME: chat_server_migrator
   COMPOSE_FILE: docker-compose-prod.yaml
+
   DB_HOST: db
   DB_PORT: 5432
+  MIGRATOR_NAME: chat_server_migrator
   MIGRATIONS_DIR: ./migrations
-  GO_VERSION: 1.22
+
+  AUTH_HOST: 51.250.32.78
+  AUTH_PORT: 50051
 
 jobs:
   build-and-test:
@@ -76,6 +80,9 @@ jobs:
           echo DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }} >> .env
           echo APP_NAME=${{ env.APP_NAME }} >> .env
           echo MIGRATOR_NAME=${{ env.MIGRATOR_NAME }} >> .env
+          
+          echo AUTH_HOST=${{ env.AUTH_HOST }} >> .env
+          echo AUTH_PORT=${{ env.AUTH_PORT }} >> .env
 
       - name: Upload .env file as artifact
         uses: actions/upload-artifact@v4.3.4

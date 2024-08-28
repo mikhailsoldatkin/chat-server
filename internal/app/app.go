@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net"
 
@@ -80,12 +79,12 @@ func (a *App) initServiceProvider(_ context.Context) error {
 func (a *App) initGRPCServer(ctx context.Context) error {
 	creds, err := credentials.NewServerTLSFromFile("cert/service.pem", "cert/service.key")
 	if err != nil {
-		log.Fatalf("failed to load TLS keys: %v", err)
+		log.Fatalf("failed to load TLS credentials from files: %v", err)
 	}
 
 	a.grpcServer = grpc.NewServer(
 		grpc.Creds(creds),
-		grpc.UnaryInterceptor(interceptor.Interceptor(a.serviceProvider.AccessClient())),
+		grpc.UnaryInterceptor(interceptor.AuthInterceptor(a.serviceProvider.AuthClient())),
 	)
 
 	reflection.Register(a.grpcServer)
@@ -96,12 +95,12 @@ func (a *App) initGRPCServer(ctx context.Context) error {
 }
 
 func (a *App) runGRPCServer() error {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", a.serviceProvider.config.GRPC.GRPCPort))
+	lis, err := net.Listen("tcp", a.serviceProvider.config.GRPC.Address)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("gRPC server is running on %d", a.serviceProvider.config.GRPC.GRPCPort)
+	log.Printf("gRPC server is running on %d", a.serviceProvider.config.GRPC.Port)
 
 	err = a.grpcServer.Serve(lis)
 	if err != nil {

@@ -13,6 +13,7 @@
 # Vendor directory
 /vendor/
 
+# during devepompent
 ## Private keys
 #cert/*.key
 #

@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	accessProto "github.com/mikhailsoldatkin/auth/pkg/access_v1"
+	pb "github.com/mikhailsoldatkin/auth/pkg/access_v1"
 	"github.com/mikhailsoldatkin/chat-server/internal/api/chat"
 	"github.com/mikhailsoldatkin/chat-server/internal/config"
 	"github.com/mikhailsoldatkin/chat-server/internal/repository"
@@ -20,13 +20,12 @@ import (
 )
 
 type serviceProvider struct {
-	config         *config.Config
-	dbClient       db.Client
-	txManager      db.TxManager
-	chatRepository repository.ChatRepository
-	chatService    service.ChatService
-	//accessClient   accessProto.AccessV1Client
-
+	config             *config.Config
+	dbClient           db.Client
+	txManager          db.TxManager
+	chatRepository     repository.ChatRepository
+	chatService        service.ChatService
+	authClient         pb.AccessV1Client
 	chatImplementation *chat.Implementation
 }
 
@@ -48,7 +47,7 @@ func (s *serviceProvider) Config() *config.Config {
 
 func (s *serviceProvider) DBClient(ctx context.Context) db.Client {
 	if s.dbClient == nil {
-		cl, err := pg.New(ctx, s.Config().Database.PostgresDSN)
+		cl, err := pg.New(ctx, s.Config().DB.PostgresDSN)
 		if err != nil {
 			log.Fatalf("failed to create db client: %v", err)
 		}
@@ -92,21 +91,23 @@ func (s *serviceProvider) ChatService(ctx context.Context) service.ChatService {
 	return s.chatService
 }
 
-func (s *serviceProvider) AccessClient() accessProto.AccessV1Client {
-	creds, err := credentials.NewClientTLSFromFile("cert/ca.cert", "")
-	if err != nil {
-		log.Fatalf("failed to process credentials: %v", err)
+func (s *serviceProvider) AuthClient() pb.AccessV1Client {
+	if s.authClient == nil {
+		creds, err := credentials.NewClientTLSFromFile("cert/ca.cert", "")
+		if err != nil {
+			log.Fatalf("failed to load TLS credentials from files: %v", err)
+		}
+
+		conn, err := grpc.NewClient(s.Config().Auth.Address, grpc.WithTransportCredentials(creds))
+		if err != nil {
+			log.Fatalf("failed to create connection: %v", err)
+		}
+		closer.Add(conn.Close)
+
+		return pb.NewAccessV1Client(conn)
 	}
 
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(creds))
-	if err != nil {
-		log.Fatalf("failed to create connection: %v", err)
-	}
-	closer.Add(conn.Close)
-
-	client := accessProto.NewAccessV1Client(conn)
-
-	return client
+	return s.authClient
 }
 
 func (s *serviceProvider) ChatImplementation(ctx context.Context) *chat.Implementation {

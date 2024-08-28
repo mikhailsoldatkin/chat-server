@@ -2,12 +2,12 @@ package chat
 
 import (
 	"github.com/mikhailsoldatkin/chat-server/internal/service"
-	pb "github.com/mikhailsoldatkin/chat-server/pkg/chat_v1"
+	pbChat "github.com/mikhailsoldatkin/chat-server/pkg/chat_v1"
 )
 
 // Implementation provides methods for handling chat-related gRPC requests.
 type Implementation struct {
-	pb.UnimplementedChatV1Server
+	pbChat.UnimplementedChatV1Server
 	chatService service.ChatService
 }
 
