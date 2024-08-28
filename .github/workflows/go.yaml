@@ -23,6 +23,8 @@ env:
   AUTH_HOST: 51.250.32.78
   AUTH_PORT: 50051
 
+  GRPC_HOST: 0.0.0.0
+
 jobs:
   build-and-test:
     name: Build and test
@@ -77,6 +79,7 @@ jobs:
           echo DB_HOST_PORT=${{ secrets.DB_HOST_PORT }} >> .env
           echo MIGRATIONS_DIR=${{ env.MIGRATIONS_DIR }} >> .env
           echo GRPC_PORT=${{ secrets.GRPC_PORT }} >> .env
+          echo GRPC_HOST${{ env.GRPC_HOST }} >> .env
           echo DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }} >> .env
           echo APP_NAME=${{ env.APP_NAME }} >> .env
           echo MIGRATOR_NAME=${{ env.MIGRATOR_NAME }} >> .env
