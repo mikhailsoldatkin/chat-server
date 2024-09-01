@@ -3,13 +3,13 @@ package interceptor
 import (
 	"context"
 
-	pb "github.com/mikhailsoldatkin/auth/pkg/access_v1"
+	grpcClient "github.com/mikhailsoldatkin/chat-server/internal/client/grpc_client"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
 
-// AuthInterceptor creates a gRPC server interceptor that checks access using the provided AccessV1Client.
-func AuthInterceptor(c pb.AccessV1Client) grpc.UnaryServerInterceptor {
+// AuthInterceptor creates a gRPC server interceptor that checks access using the provided gRPC client.
+func AuthInterceptor(cl grpcClient.AuthClient) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
 		req any,
@@ -19,7 +19,7 @@ func AuthInterceptor(c pb.AccessV1Client) grpc.UnaryServerInterceptor {
 		md, _ := metadata.FromIncomingContext(ctx)
 		ctx = metadata.NewOutgoingContext(ctx, md)
 
-		_, err := c.Check(ctx, &pb.CheckRequest{Endpoint: info.FullMethod})
+		err := cl.CheckAccess(ctx, info.FullMethod)
 		if err != nil {
 			return nil, err
 		}

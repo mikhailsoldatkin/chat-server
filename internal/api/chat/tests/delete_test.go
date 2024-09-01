@@ -77,7 +77,7 @@ func TestDelete(t *testing.T) {
 			t.Parallel()
 
 			chatServiceMock := tt.chatServiceMock(mc)
-			api := chatAPI.NewImplementation(chatServiceMock)
+			api := chatAPI.NewMockImplementation(chatServiceMock)
 
 			resp, grpcErr := api.Delete(tt.args.ctx, tt.args.req)
 			require.Equal(t, tt.err, grpcErr)
