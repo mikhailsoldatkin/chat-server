@@ -15,7 +15,7 @@ func (i *Implementation) Create(ctx context.Context, req *pb.CreateRequest) (*pb
 		return nil, status.Errorf(codes.InvalidArgument, "no users provided for the chat")
 	}
 
-	err := i.client.CheckUsersExist(ctx, req.Users)
+	err := i.authClient.CheckUsersExist(ctx, req.Users)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}

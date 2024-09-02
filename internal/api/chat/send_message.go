@@ -12,7 +12,7 @@ import (
 
 // SendMessage handles sending a message from a user to a chat.
 func (i *Implementation) SendMessage(ctx context.Context, req *pb.SendMessageRequest) (*emptypb.Empty, error) {
-	err := i.client.CheckUsersExist(ctx, []int64{req.FromUser})
+	err := i.authClient.CheckUsersExist(ctx, []int64{req.FromUser})
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}

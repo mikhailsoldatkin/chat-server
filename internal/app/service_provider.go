@@ -4,8 +4,11 @@ import (
 	"context"
 	"log"
 
+	pbAccess "github.com/mikhailsoldatkin/auth/pkg/access_v1"
+	pbUser "github.com/mikhailsoldatkin/auth/pkg/user_v1"
 	"github.com/mikhailsoldatkin/chat-server/internal/api/chat"
-	"github.com/mikhailsoldatkin/chat-server/internal/client/grpc_client"
+	"github.com/mikhailsoldatkin/chat-server/internal/client"
+	"github.com/mikhailsoldatkin/chat-server/internal/client/auth"
 	"github.com/mikhailsoldatkin/chat-server/internal/config"
 	"github.com/mikhailsoldatkin/chat-server/internal/repository"
 	chatRepository "github.com/mikhailsoldatkin/chat-server/internal/repository/chat"
@@ -15,6 +18,8 @@ import (
 	"github.com/mikhailsoldatkin/platform_common/pkg/db"
 	"github.com/mikhailsoldatkin/platform_common/pkg/db/pg"
 	"github.com/mikhailsoldatkin/platform_common/pkg/db/transaction"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 type serviceProvider struct {
@@ -23,7 +28,7 @@ type serviceProvider struct {
 	txManager          db.TxManager
 	chatRepository     repository.ChatRepository
 	chatService        service.ChatService
-	authClient         grpc_client.AuthClient
+	authClient         client.AuthClient
 	chatImplementation *chat.Implementation
 }
 
@@ -47,7 +52,7 @@ func (s *serviceProvider) DBClient(ctx context.Context) db.Client {
 	if s.dbClient == nil {
 		cl, err := pg.New(ctx, s.Config().DB.PostgresDSN)
 		if err != nil {
-			log.Fatalf("failed to create db authClient: %v", err)
+			log.Fatalf("failed to create db client: %v", err)
 		}
 
 		err = cl.DB().Ping(ctx)
@@ -89,14 +94,25 @@ func (s *serviceProvider) ChatService(ctx context.Context) service.ChatService {
 	return s.chatService
 }
 
-func (s *serviceProvider) AuthClient() grpc_client.AuthClient {
+func (s *serviceProvider) AuthClient() client.AuthClient {
 	if s.authClient == nil {
-		cl, err := grpc_client.NewAuthClient(s.Config().Auth.Address, "cert/ca.cert")
+		creds, err := credentials.NewClientTLSFromFile("cert/ca.cert", "")
 		if err != nil {
-			log.Fatalf("failed to create grpc auth client: %v", err)
+			log.Fatalf("failed to load TLS credentials from file: %v", err)
 		}
-		s.authClient = cl
+
+		conn, err := grpc.NewClient(s.Config().Auth.Address, grpc.WithTransportCredentials(creds))
+		if err != nil {
+			log.Fatalf("failed to create connection to auth server: %v", err)
+		}
+		closer.Add(conn.Close)
+
+		s.authClient = auth.NewAuthClient(
+			pbAccess.NewAccessV1Client(conn),
+			pbUser.NewUserV1Client(conn),
+		)
 	}
+
 	return s.authClient
 }
 

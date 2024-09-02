@@ -2,12 +2,17 @@ include .env
 LOCAL_BIN:=$(CURDIR)/bin
 CHAT_API:=chat_v1
 CERT_FOLDER:=cert
+REPO:=github.com/mikhailsoldatkin/chat-server
 
 install-golangci-lint:
 	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.3
 
 lint:
 	GOBIN=$(LOCAL_BIN) golangci-lint run ./... --config .golangci.pipeline.yaml
+
+test:
+	go clean -testcache
+	go test ./... -covermode count -coverpkg=${REPO}/internal/service/...,${REPO}/internal/api/... -count 5
 
 install-deps:
 	GOBIN=$(LOCAL_BIN) go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.2
