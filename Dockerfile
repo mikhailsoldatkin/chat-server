@@ -20,7 +20,13 @@ RUN apk update && \
 
 WORKDIR /chat
 
+RUN mkdir -p cert
+
 COPY --from=builder /chat/chat_server .
+
 COPY .env .
+COPY cert/service.key cert/service.key
+COPY cert/service.pem cert/service.pem
+COPY cert/ca.cert cert/ca.cert
 
 CMD ["./chat_server"]

@@ -2,12 +2,12 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net"
 
+	"github.com/mikhailsoldatkin/chat-server/internal/interceptor"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/mikhailsoldatkin/chat-server/internal/config"
@@ -72,24 +72,35 @@ func (a *App) initConfig(_ context.Context) error {
 
 func (a *App) initServiceProvider(_ context.Context) error {
 	a.serviceProvider = newServiceProvider()
+
 	return nil
 }
 
 func (a *App) initGRPCServer(ctx context.Context) error {
-	a.grpcServer = grpc.NewServer(grpc.Creds(insecure.NewCredentials()))
+	creds, err := credentials.NewServerTLSFromFile("cert/service.pem", "cert/service.key")
+	if err != nil {
+		log.Fatalf("failed to load TLS credentials from files: %v", err)
+	}
+
+	a.grpcServer = grpc.NewServer(
+		grpc.Creds(creds),
+		grpc.UnaryInterceptor(interceptor.AuthInterceptor(a.serviceProvider.AuthClient())),
+	)
+
 	reflection.Register(a.grpcServer)
+
 	pb.RegisterChatV1Server(a.grpcServer, a.serviceProvider.ChatImplementation(ctx))
 
 	return nil
 }
 
 func (a *App) runGRPCServer() error {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", a.serviceProvider.config.GRPC.GRPCPort))
+	lis, err := net.Listen("tcp", a.serviceProvider.config.GRPC.Address)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("gRPC server is running on %d", a.serviceProvider.config.GRPC.GRPCPort)
+	log.Printf("gRPC server is running on %d", a.serviceProvider.config.GRPC.Port)
 
 	err = a.grpcServer.Serve(lis)
 	if err != nil {

@@ -4,17 +4,22 @@ import (
 	"context"
 	"log"
 
+	pbAccess "github.com/mikhailsoldatkin/auth/pkg/access_v1"
+	pbUser "github.com/mikhailsoldatkin/auth/pkg/user_v1"
 	"github.com/mikhailsoldatkin/chat-server/internal/api/chat"
+	"github.com/mikhailsoldatkin/chat-server/internal/client"
+	"github.com/mikhailsoldatkin/chat-server/internal/client/auth"
+	"github.com/mikhailsoldatkin/chat-server/internal/config"
+	"github.com/mikhailsoldatkin/chat-server/internal/repository"
 	chatRepository "github.com/mikhailsoldatkin/chat-server/internal/repository/chat"
 	"github.com/mikhailsoldatkin/chat-server/internal/service"
 	chatService "github.com/mikhailsoldatkin/chat-server/internal/service/chat"
+	"github.com/mikhailsoldatkin/platform_common/pkg/closer"
 	"github.com/mikhailsoldatkin/platform_common/pkg/db"
 	"github.com/mikhailsoldatkin/platform_common/pkg/db/pg"
 	"github.com/mikhailsoldatkin/platform_common/pkg/db/transaction"
-
-	"github.com/mikhailsoldatkin/chat-server/internal/config"
-	"github.com/mikhailsoldatkin/chat-server/internal/repository"
-	"github.com/mikhailsoldatkin/platform_common/pkg/closer"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 type serviceProvider struct {
@@ -23,6 +28,7 @@ type serviceProvider struct {
 	txManager          db.TxManager
 	chatRepository     repository.ChatRepository
 	chatService        service.ChatService
+	authClient         client.AuthClient
 	chatImplementation *chat.Implementation
 }
 
@@ -44,7 +50,7 @@ func (s *serviceProvider) Config() *config.Config {
 
 func (s *serviceProvider) DBClient(ctx context.Context) db.Client {
 	if s.dbClient == nil {
-		cl, err := pg.New(ctx, s.Config().Database.PostgresDSN)
+		cl, err := pg.New(ctx, s.Config().DB.PostgresDSN)
 		if err != nil {
 			log.Fatalf("failed to create db client: %v", err)
 		}
@@ -88,9 +94,34 @@ func (s *serviceProvider) ChatService(ctx context.Context) service.ChatService {
 	return s.chatService
 }
 
+func (s *serviceProvider) AuthClient() client.AuthClient {
+	if s.authClient == nil {
+		creds, err := credentials.NewClientTLSFromFile("cert/ca.cert", "")
+		if err != nil {
+			log.Fatalf("failed to load TLS credentials from file: %v", err)
+		}
+
+		conn, err := grpc.NewClient(s.Config().Auth.Address, grpc.WithTransportCredentials(creds))
+		if err != nil {
+			log.Fatalf("failed to create connection to auth server: %v", err)
+		}
+		closer.Add(conn.Close)
+
+		s.authClient = auth.NewAuthClient(
+			pbAccess.NewAccessV1Client(conn),
+			pbUser.NewUserV1Client(conn),
+		)
+	}
+
+	return s.authClient
+}
+
 func (s *serviceProvider) ChatImplementation(ctx context.Context) *chat.Implementation {
 	if s.chatImplementation == nil {
-		s.chatImplementation = chat.NewImplementation(s.ChatService(ctx))
+		s.chatImplementation = chat.NewImplementation(
+			s.ChatService(ctx),
+			s.AuthClient(),
+		)
 	}
 
 	return s.chatImplementation

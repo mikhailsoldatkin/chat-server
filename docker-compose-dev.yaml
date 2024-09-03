@@ -8,6 +8,9 @@ services:
       - ${GRPC_PORT}:${GRPC_PORT}
     env_file:
       - .env
+    networks:
+      - microservices_network
+      - internal_network
     depends_on:
       - db
 
@@ -21,6 +24,8 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: always
+    networks:
+      - internal_network
 
   migrator:
     build:
@@ -28,6 +33,14 @@ services:
       dockerfile: migrator.Dockerfile
     container_name: ${MIGRATOR_NAME}
     restart: on-failure
+    networks:
+      - internal_network
 
 volumes:
   pgdata:
+
+networks:
+  microservices_network:
+    external: true
+  internal_network:
+    driver: bridge

@@ -1,12 +1,18 @@
 include .env
 LOCAL_BIN:=$(CURDIR)/bin
 CHAT_API:=chat_v1
+CERT_FOLDER:=cert
+REPO:=github.com/mikhailsoldatkin/chat-server
 
 install-golangci-lint:
 	GOBIN=$(LOCAL_BIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.3
 
 lint:
 	GOBIN=$(LOCAL_BIN) golangci-lint run ./... --config .golangci.pipeline.yaml
+
+test:
+	go clean -testcache
+	go test ./... -covermode count -coverpkg=${REPO}/internal/service/...,${REPO}/internal/api/... -count 5
 
 install-deps:
 	GOBIN=$(LOCAL_BIN) go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.2
@@ -36,3 +42,12 @@ local-migration-up:
 
 local-migration-down:
 	$(LOCAL_BIN)/goose -dir ${MIGRATIONS_DIR} postgres ${PG_DSN} down -v
+
+gen-cert:
+	mkdir -p $(CERT_FOLDER)
+	openssl genrsa -out $(CERT_FOLDER)/ca.key 4096 && \
+    openssl req -new -x509 -key $(CERT_FOLDER)/ca.key -sha256 -subj "/C=RU/ST=Moscow/O=Test, Inc." -days 365 -out $(CERT_FOLDER)/ca.cert && \
+    openssl genrsa -out $(CERT_FOLDER)/service.key 4096 && \
+    openssl req -new -key $(CERT_FOLDER)/service.key -out $(CERT_FOLDER)/service.csr -config $(CERT_FOLDER)/certificate.conf && \
+    openssl x509 -req -in $(CERT_FOLDER)/service.csr -CA $(CERT_FOLDER)/ca.cert -CAkey $(CERT_FOLDER)/ca.key -CAcreateserial \
+        -out $(CERT_FOLDER)/service.pem -days 365 -sha256 -extfile $(CERT_FOLDER)/certificate.conf -extensions req_ext

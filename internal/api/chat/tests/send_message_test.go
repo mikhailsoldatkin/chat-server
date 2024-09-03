@@ -85,7 +85,7 @@ func TestSendMessage(t *testing.T) {
 			t.Parallel()
 
 			chatServiceMock := tt.chatServiceMock(mc)
-			api := chatAPI.NewImplementation(chatServiceMock)
+			api := chatAPI.NewMockImplementation(chatServiceMock)
 
 			resp, grpcErr := api.SendMessage(tt.args.ctx, tt.args.req)
 			require.Equal(t, tt.err, grpcErr)

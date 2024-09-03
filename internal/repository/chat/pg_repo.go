@@ -28,11 +28,13 @@ const (
 	chatEntity      = "chat"
 )
 
+var _ repository.ChatRepository = (*repo)(nil)
+
 type repo struct {
 	db db.Client
 }
 
-// NewRepository creates a new instance of the chat repository.
+// NewRepository creates a new instance of the chat Postgres repository.
 func NewRepository(db db.Client) repository.ChatRepository {
 	return &repo{db: db}
 }
