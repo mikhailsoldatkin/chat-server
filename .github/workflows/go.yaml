@@ -25,6 +25,9 @@ env:
 
   GRPC_HOST: 0.0.0.0
 
+  JAEGER_HOST: jaeger
+  JAEGER_PORT: 6831
+
 jobs:
   build-and-test:
     name: Build and test
@@ -88,6 +91,9 @@ jobs:
           
           echo AUTH_HOST=${{ env.AUTH_HOST }} >> .env
           echo AUTH_PORT=${{ env.AUTH_PORT }} >> .env
+          
+          echo JAEGER_HOST=${{ env.JAEGER_HOST }} >> .env
+          echo JAEGER_PORT=${{ env.JAEGER_PORT }} >> .env
 
       - name: Upload .env file as artifact
         uses: actions/upload-artifact@v4.3.4
