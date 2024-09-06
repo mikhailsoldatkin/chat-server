@@ -12,7 +12,8 @@ services:
       - microservices_network
       - internal_network
     depends_on:
-      - db
+      db:
+        condition: service_started
 
   db:
     image: postgres:16.3-alpine3.20
