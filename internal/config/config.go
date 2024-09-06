@@ -34,11 +34,29 @@ type Auth struct {
 	Address string `env:"-"`
 }
 
+// Logger represents configuration for logger.
+type Logger struct {
+	Level      string `env:"LOG_LEVEL" env-required:"true"`
+	Filename   string `env:"LOG_FILENAME" env-required:"true"`
+	MaxSizeMB  int    `env:"LOG_MAX_SIZE_MB" env-required:"true"`
+	MaxBackups int    `env:"LOG_MAX_BACKUPS" env-required:"true"`
+	MaxAgeDays int    `env:"LOG_MAX_AGE_DAYS" env-required:"true"`
+}
+
+// Jaeger represents the configuration for the Jaeger server.
+type Jaeger struct {
+	Host    string `env:"JAEGER_HOST" env-required:"true"`
+	Port    int    `env:"JAEGER_PORT" env-required:"true"`
+	Address string `env:"-"`
+}
+
 // Config represents the overall application configuration.
 type Config struct {
-	DB   DB
-	GRPC GRPC
-	Auth Auth
+	DB     DB
+	GRPC   GRPC
+	Auth   Auth
+	Logger Logger
+	Jaeger Jaeger
 }
 
 // Load reads configuration from .env file.
@@ -67,6 +85,7 @@ func Load() (*Config, error) {
 
 	cfg.GRPC.Address = fmt.Sprintf("%s:%d", cfg.GRPC.Host, cfg.GRPC.Port)
 	cfg.Auth.Address = fmt.Sprintf("%s:%d", cfg.Auth.Host, cfg.Auth.Port)
+	cfg.Jaeger.Address = fmt.Sprintf("%s:%d", cfg.Jaeger.Host, cfg.Jaeger.Port)
 
 	return &cfg, nil
 }

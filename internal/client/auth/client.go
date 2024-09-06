@@ -6,6 +6,8 @@ import (
 	pbAccess "github.com/mikhailsoldatkin/auth/pkg/access_v1"
 	pbUser "github.com/mikhailsoldatkin/auth/pkg/user_v1"
 	"github.com/mikhailsoldatkin/chat-server/internal/client"
+	"github.com/opentracing/opentracing-go"
+	"github.com/pkg/errors"
 )
 
 var _ client.AuthClient = (*authClient)(nil)
@@ -26,22 +28,30 @@ func NewAuthClient(
 	}
 }
 
-// CheckAccess verifies if the specified endpoint has the required access permissions.
-// It returns an error if access is denied.
 func (cl *authClient) CheckAccess(ctx context.Context, endpoint string) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "auth-check-endpoint-access")
+	defer span.Finish()
+
+	span.SetTag("endpoint", endpoint)
+
 	_, err := cl.accessClient.Check(ctx, &pbAccess.CheckRequest{Endpoint: endpoint})
 	if err != nil {
-		return err
+		span.SetTag("error", true)
+		return errors.WithMessage(err, "checking endpoint access")
 	}
 	return nil
 }
 
-// CheckUsersExist checks a users from the given id list exist.
-// It returns an error if the users does not exist or if the operation fails.
 func (cl *authClient) CheckUsersExist(ctx context.Context, ids []int64) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "auth-check-users-exist")
+	defer span.Finish()
+
+	span.SetTag("user-ids", ids)
+
 	_, err := cl.userClient.CheckUsersExist(ctx, &pbUser.CheckUsersExistRequest{Ids: ids})
 	if err != nil {
-		return err
+		span.SetTag("error", true)
+		return errors.WithMessage(err, "checking users existence")
 	}
 	return nil
 }
