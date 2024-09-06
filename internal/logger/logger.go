@@ -15,6 +15,7 @@ func Init(core zapcore.Core, options ...zap.Option) {
 	sugarLogger = globalLogger.Sugar()
 }
 
+// Logger returns the global instance of the zap.Logger.
 func Logger() *zap.Logger {
 	return globalLogger
 }
