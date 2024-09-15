@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
 	pbAccess "github.com/mikhailsoldatkin/auth/pkg/access_v1"
 	pbUser "github.com/mikhailsoldatkin/auth/pkg/user_v1"
 	"github.com/mikhailsoldatkin/chat-server/internal/api/chat"
@@ -18,6 +19,7 @@ import (
 	"github.com/mikhailsoldatkin/platform_common/pkg/db"
 	"github.com/mikhailsoldatkin/platform_common/pkg/db/pg"
 	"github.com/mikhailsoldatkin/platform_common/pkg/db/transaction"
+	"github.com/opentracing/opentracing-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -101,9 +103,13 @@ func (s *serviceProvider) AuthClient() client.AuthClient {
 			log.Fatalf("failed to load TLS credentials from file: %v", err)
 		}
 
-		conn, err := grpc.NewClient(s.Config().Auth.Address, grpc.WithTransportCredentials(creds))
+		conn, err := grpc.NewClient(
+			s.Config().Auth.Address,
+			grpc.WithTransportCredentials(creds),
+			grpc.WithUnaryInterceptor(otgrpc.OpenTracingClientInterceptor(opentracing.GlobalTracer())),
+		)
 		if err != nil {
-			log.Fatalf("failed to create connection to auth server: %v", err)
+			log.Fatalf("failed to create connection to authentication server: %v", err)
 		}
 		closer.Add(conn.Close)
 

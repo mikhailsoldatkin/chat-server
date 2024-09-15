@@ -4,8 +4,15 @@ import (
 	"context"
 	"log"
 	"net"
+	"os"
 
+	grpcMiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/mikhailsoldatkin/chat-server/internal/interceptor"
+	"github.com/mikhailsoldatkin/chat-server/internal/logger"
+	"github.com/mikhailsoldatkin/chat-server/internal/tracing"
+	"github.com/natefinch/lumberjack"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
@@ -49,6 +56,8 @@ func (a *App) initDeps(ctx context.Context) error {
 		a.initConfig,
 		a.initServiceProvider,
 		a.initGRPCServer,
+		a.initLogger,
+		a.initTracing,
 	}
 
 	for _, f := range inits {
@@ -84,7 +93,12 @@ func (a *App) initGRPCServer(ctx context.Context) error {
 
 	a.grpcServer = grpc.NewServer(
 		grpc.Creds(creds),
-		grpc.UnaryInterceptor(interceptor.AuthInterceptor(a.serviceProvider.AuthClient())),
+		grpc.UnaryInterceptor(
+			grpcMiddleware.ChainUnaryServer(
+				interceptor.ServerTracingInterceptor,
+				interceptor.AuthInterceptor(a.serviceProvider.AuthClient()),
+			),
+		),
 	)
 
 	reflection.Register(a.grpcServer)
@@ -107,5 +121,46 @@ func (a *App) runGRPCServer() error {
 		return err
 	}
 
+	return nil
+}
+
+// initLogger initializes the app logger.
+func (a *App) initLogger(_ context.Context) error {
+	var level zapcore.Level
+	if err := level.Set(a.serviceProvider.config.Logger.Level); err != nil {
+		return err
+	}
+
+	stdout := zapcore.AddSync(os.Stdout)
+
+	file := zapcore.AddSync(&lumberjack.Logger{
+		Filename:   a.serviceProvider.config.Logger.Filename,
+		MaxSize:    a.serviceProvider.config.Logger.MaxSizeMB,
+		MaxBackups: a.serviceProvider.config.Logger.MaxBackups,
+		MaxAge:     a.serviceProvider.config.Logger.MaxAgeDays,
+	})
+
+	productionCfg := zap.NewProductionEncoderConfig()
+	productionCfg.TimeKey = "timestamp"
+	productionCfg.EncodeTime = zapcore.TimeEncoderOfLayout("2006/01/02 15:04:05")
+
+	developmentCfg := zap.NewDevelopmentEncoderConfig()
+	developmentCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	developmentCfg.EncodeTime = zapcore.TimeEncoderOfLayout("2006/01/02 15:04:05")
+
+	consoleEncoder := zapcore.NewConsoleEncoder(developmentCfg)
+	fileEncoder := zapcore.NewJSONEncoder(productionCfg)
+
+	logger.Init(zapcore.NewTee(
+		zapcore.NewCore(consoleEncoder, stdout, zap.NewAtomicLevelAt(level)),
+		zapcore.NewCore(fileEncoder, file, zap.NewAtomicLevelAt(level)),
+	))
+
+	return nil
+}
+
+// initTracing initializes the tracing for the application by setting up the Jaeger tracer.
+func (a *App) initTracing(_ context.Context) error {
+	tracing.Init(logger.Logger(), "chat-server", a.serviceProvider.config.Jaeger.Address)
 	return nil
 }

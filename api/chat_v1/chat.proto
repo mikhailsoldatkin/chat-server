@@ -2,9 +2,7 @@ syntax = "proto3";
 
 package chat_v1;
 
-import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
-import "google/protobuf/wrappers.proto";
 
 option go_package = "github.com/mikhailsoldatkin/chat-server;chat_v1";
 
@@ -15,7 +13,7 @@ service ChatV1 {
 }
 
 message CreateRequest {
-  repeated int64 users = 1;
+  repeated int64 users_ids = 1;
 }
 
 message CreateResponse {

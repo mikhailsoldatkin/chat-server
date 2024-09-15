@@ -12,7 +12,8 @@ services:
       - microservices_network
       - internal_network
     depends_on:
-      - db
+      db:
+        condition: service_started
 
   db:
     image: postgres:16.3-alpine3.20
@@ -34,6 +35,20 @@ services:
     container_name: ${MIGRATOR_NAME}
     restart: on-failure
     networks:
+      - internal_network
+
+  jaeger:
+    image: jaegertracing/all-in-one:1
+    container_name: jaeger
+    env_file:
+      - .env
+    ports:
+      - "${JAEGER_PORT}:${JAEGER_PORT}/udp"   # jaeger-agent
+      - "5778:5778"                           # sampling strategy endpoint
+      - "16686:16686"                         # web UI
+      - "14268:14268"                         # collector HTTP endpoint
+    networks:
+      - microservices_network
       - internal_network
 
 volumes:

@@ -34,7 +34,7 @@ func TestCreate(t *testing.T) {
 		userID = gofakeit.Int64()
 		users  = []int64{userID}
 
-		req = &pb.CreateRequest{Users: users}
+		req = &pb.CreateRequest{UsersIds: users}
 
 		wantResp     = &pb.CreateResponse{Id: id}
 		wantChat     = &model.Chat{ID: id}
